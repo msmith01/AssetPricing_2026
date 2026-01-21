@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Binomial Options Pricing with R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="binomialPricingInR_files/libs/clipboard/clipboard.min.js"></script>
+<script src="binomialPricingInR_files/libs/quarto-html/quarto.js"></script>
+<script src="binomialPricingInR_files/libs/quarto-html/popper.min.js"></script>
+<script src="binomialPricingInR_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="binomialPricingInR_files/libs/quarto-html/anchor.min.js"></script>
+<link href="binomialPricingInR_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="binomialPricingInR_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="binomialPricingInR_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="binomialPricingInR_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="binomialPricingInR_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Binomial Options Pricing with R</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="objective" class="level2">
+<h2 class="anchored" data-anchor-id="objective">Objective</h2>
+<p>Explore Binomial trees in option pricing using R</p>
+</section>
+<section id="binomial-experiment" class="level2">
+<h2 class="anchored" data-anchor-id="binomial-experiment">Binomial experiment</h2>
+<p>Stock prices are said to following a random walk -i.e flipping a coin.</p>
+<p>Each successive coin toss represents a binomial trial with two outcomes “success” or “failure”.</p>
+<p>If a coin is tossed twice <span class="math inline">\(X = ({H, T})^2\)</span> the probability of getting a head <span class="math inline">\(H\)</span> is denoted by <span class="math inline">\(p\)</span> and the pronbability of getting a tail <span class="math inline">\(T\)</span> is denoted by <span class="math inline">\((1 - p)\)</span>.</p>
+<p>The number of successive tosses is denoted by <span class="math inline">\(n\)</span> which follows a <em>discrete</em> process. The binomial probability distribution of <span class="math inline">\(X\)</span> is given by:</p>
+<p><span class="math display">\[
+f_{X} = \sum_{k=1}^{n} p^k (1-p)^{n-k}
+\]</span></p>
+<p>In this case we have <span class="math inline">\(n = 2\)</span>, the probability of success is <span class="math inline">\(0.5\)</span>.</p>
+</section>
+<section id="binomial-trees" class="level2">
+<h2 class="anchored" data-anchor-id="binomial-trees">Binomial trees</h2>
+<p>Binomial trees are a technique to model the movement of stock prices. Its a graphical representation of the possible paths the stock price can take over the life of the option. Each step is represented by an a probability of an up movement or down movement.</p>
+<p>Consider successive coin tosses as share prices - share price <span class="math inline">\(S_{0} = \$100\)</span>, - the strike price is <span class="math inline">\(K = \$100\)</span>, - the risk free rate is <span class="math inline">\(r = 2.5\%\)</span>, <span class="math inline">\(t = 0, 1, 2\)</span> - The upwards and downwards movement of the share is <span class="math inline">\(u = 1.0488\)</span> and <span class="math inline">\(d = 0..9747\)</span></p>
+<p>We want to calculate the outcome of the share price at each step, so;</p>
+<ul>
+<li>At <span class="math inline">\(t = 0\)</span>
+<ul>
+<li>we have <span class="math inline">\(S_{0} = \$100\)</span></li>
+</ul></li>
+<li>At <span class="math inline">\(t = 1\)</span>
+<ul>
+<li><span class="math inline">\(S_{u} = uS_{0} = (1.0488)(100) = 104.88\)</span></li>
+<li><span class="math inline">\(S_{d} = dS_{0} = (0.9747)(100) = 97.47\)</span></li>
+</ul></li>
+<li>At <span class="math inline">\(t = 2\)</span>,
+<ul>
+<li>we have <span class="math inline">\(S_{uu} = uuS_{0} = \$110\)</span>
+<ul>
+<li>computed as <span class="math inline">\((1.0488)*(1.0488)*(100)\)</span></li>
+</ul></li>
+<li><span class="math inline">\(S_{ud} = udS_{0} = \$102.44\)</span>
+<ul>
+<li>computed as <span class="math inline">\((1.0488)*(0.9747)*100\)</span></li>
+</ul></li>
+<li><span class="math inline">\(S_{dd} = ddS_{0} = \$94.96\)</span>
+<ul>
+<li>computed as <span class="math inline">\(0.9747 * 0.9747 * 100\)</span></li>
+</ul></li>
+</ul></li>
+</ul>
+<p><img src="binomialTreeRScriptExample.png" class="img-fluid"></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>binomialTree <span class="ot">=</span> <span class="cf">function</span>(s, delta_t, u, d, N){</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  tree <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> N<span class="sc">+</span><span class="dv">1</span>, <span class="at">ncol =</span> N<span class="sc">+</span><span class="dv">1</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  sigma <span class="ot">=</span> <span class="fu">log</span>(u) <span class="sc">/</span> <span class="fu">sqrt</span>(delta_t)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  sigma <span class="ot">=</span> <span class="fu">log</span>(d) <span class="sc">/</span> <span class="fu">sqrt</span>(delta_t)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(N<span class="sc">+</span><span class="dv">1</span>)){</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span>(j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>i){</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>      tree[i, j] <span class="ot">=</span> s <span class="sc">*</span> u<span class="sc">^</span>(j<span class="dv">-1</span>) <span class="sc">*</span> d<span class="sc">^</span>((i<span class="dv">-1</span>) <span class="sc">-</span>(j<span class="dv">-1</span>))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(tree)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">binomialTree</span>(</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">s =</span> <span class="dv">100</span>,</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_t =</span> <span class="dv">1</span>,</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">u =</span> <span class="fl">1.0488</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> <span class="fl">0.9747</span>,</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">N =</span> <span class="dv">2</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>          [,1]     [,2]     [,3]
+[1,] 100.00000   0.0000   0.0000
+[2,]  97.47000 104.8800   0.0000
+[3,]  95.00401 102.2265 109.9981</code></pre>
+</div>
+</div>
+<ul>
+<li>Here the first row of the matrix corresponds to the share price of the first node.</li>
+<li>The second row corresponds to the share price of the second node <span class="math inline">\(97.47\)</span> and <span class="math inline">\(104.88\)</span></li>
+<li>The third row corresponds to the share price in the first node of the tree <span class="math inline">\(95\)</span>, <span class="math inline">\(102.23\)</span> and <span class="math inline">\(110\)</span></li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">binomialTree</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">s =</span> <span class="dv">100</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_t =</span> <span class="dv">1</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">u =</span> <span class="fl">1.0488</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> <span class="fl">0.9747</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">N =</span> <span class="dv">7</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>          [,1]      [,2]      [,3]     [,4]     [,5]     [,6]     [,7]     [,8]
+[1,] 100.00000   0.00000   0.00000   0.0000   0.0000   0.0000   0.0000   0.0000
+[2,]  97.47000 104.88000   0.00000   0.0000   0.0000   0.0000   0.0000   0.0000
+[3,]  95.00401 102.22654 109.99814   0.0000   0.0000   0.0000   0.0000   0.0000
+[4,]  92.60041  99.64020 107.21519 115.3661   0.0000   0.0000   0.0000   0.0000
+[5,]  90.25762  97.11931 104.50265 112.4473 120.9959   0.0000   0.0000   0.0000
+[6,]  87.97410  94.66219 101.85873 109.6024 117.9347 126.9005   0.0000   0.0000
+[7,]  85.74835  92.26724  99.28170 106.8294 114.9510 123.6899 133.0933   0.0000
+[8,]  83.57892  89.93287  96.76988 104.1267 112.0427 120.5606 129.7260 139.5882</code></pre>
+</div>
+</div>
+</section>
+<section id="options-pricing" class="level2">
+<h2 class="anchored" data-anchor-id="options-pricing">Options pricing</h2>
+<p>Consider the purchase of a European Call option with a strike of <span class="math inline">\(K = \$100\)</span> The current price is <span class="math inline">\(\$100\)</span> with an expiration date T. - If stock price at expiry is less than <span class="math inline">\(\$100\)</span> we do not exercise. - If the stock price is greater than <span class="math inline">\(\$100\)</span> then we exercise.</p>
+<p>Suppose the share price is greater than <span class="math inline">\(\$100\)</span></p>
+<p>The risk neutral probability of an up-move is;</p>
+<p><span class="math display">\[
+q = \dfrac{(1+r)\Delta t - d}{u - d}
+\]</span></p>
+<p>Suppose continuously compounding rate;</p>
+<p><span class="math display">\[
+q = \dfrac{e^{r\Delta t} - d}{u - d}
+\]</span> The risk neutral probability of a down-move is <span class="math inline">\((1-q)\)</span> where <span class="math inline">\(\Delta t = \dfrac{T}{N}\)</span></p>
+<p>The price of a European call option <span class="math inline">\(C_{0}\)</span> and the price of a European put option <span class="math inline">\(P_{0}\)</span> is given by;</p>
+<p><span class="math display">\[
+C_{0} = (e^{-r\Delta t})^N \sum_{k=0}^{N} \dfrac{N!}{k!(N-K)!}(S_{0}u^k d^{N-k} - K) + q^k(1-q)^{N-K}
+\]</span></p>
+<p><span class="math display">\[
+P_{0} = (e ^{-r\Delta t})^N \sum_{k=0}^{N} \dfrac{N!}{k!(N-K)!}(K - S_{0}u^k d^{N-k}) + q^k(1-q)^{N-K}
+\]</span></p>
+<p>Compute the risk neutral probability</p>
+<p><span class="math display">\[
+q = \dfrac{(1 + 0.05) (\dfrac{2}{2}) - 0.98}{1-0488 - 0.9747} = 0.6788
+\]</span></p>
+<p>We can compute this using;</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>q_prob <span class="ot">=</span> <span class="cf">function</span>(r, delta_t, u, d){</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">=</span> (<span class="dv">1</span> <span class="sc">+</span> r) <span class="sc">*</span> delta_t</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  q <span class="ot">=</span> (X <span class="sc">*</span> delta_t <span class="sc">-</span> d) <span class="sc">/</span> (u <span class="sc">-</span> d)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(q)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">q_prob</span>(</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">r =</span> <span class="fl">0.025</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_t =</span> <span class="dv">1</span>,</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">u =</span> <span class="fl">1.0488</span>,</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> <span class="fl">0.9747</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.6788124</code></pre>
+</div>
+</div>
+<p>So, our risk neutral probability <span class="math inline">\(q\)</span> is 0.6788124</p>
+</section>
+<section id="cox-ross-rubinstein-crr-model" class="level1">
+<h1>Cox-Ross-Rubinstein (CRR) model</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>CRR_model_call_put <span class="ot">=</span> <span class="cf">function</span>(tree, u, d, delta_t, r, K, type){</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  q <span class="ot">=</span> <span class="fu">q_prob</span>(r, delta_t, u, d)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  option_tree <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> <span class="fu">nrow</span>(tree), <span class="at">ncol =</span> <span class="fu">ncol</span>(tree))</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span>(type <span class="sc">==</span> <span class="st">'put'</span>){</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    option_tree[<span class="fu">nrow</span>(option_tree), ] <span class="ot">=</span> <span class="fu">pmax</span>(K <span class="sc">-</span> tree[<span class="fu">nrow</span>(tree), ], <span class="dv">0</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    option_tree[<span class="fu">nrow</span>(option_tree), ] <span class="ot">=</span> <span class="fu">pmax</span>(tree[<span class="fu">nrow</span>(tree), ] <span class="sc">-</span> K, <span class="dv">0</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (i <span class="cf">in</span> (<span class="fu">nrow</span>(tree) <span class="sc">-</span> <span class="dv">1</span>)<span class="sc">:</span><span class="dv">1</span>){</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>i){</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>      option_tree[i, j] <span class="ot">=</span> ((<span class="dv">1</span> <span class="sc">-</span> q) <span class="sc">*</span> option_tree[i <span class="sc">+</span> <span class="dv">1</span>, j] <span class="sc">+</span> q <span class="sc">*</span> option_tree[i <span class="sc">+</span> <span class="dv">1</span>, j <span class="sc">+</span> <span class="dv">1</span>]) <span class="sc">/</span> <span class="fu">exp</span>(r <span class="sc">*</span> delta_t)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(option_tree)</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>TREE <span class="ot">=</span> <span class="fu">binomialTree</span>(</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">s =</span> <span class="dv">100</span>,</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_t =</span> <span class="dv">1</span>,</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">u =</span> <span class="fl">1.0488</span>,</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> <span class="fl">0.9747</span>,</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">N =</span> <span class="dv">2</span></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>TREE</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>          [,1]     [,2]     [,3]
+[1,] 100.00000   0.0000   0.0000
+[2,]  97.47000 104.8800   0.0000
+[3,]  95.00401 102.2265 109.9981</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">CRR_model_call_put</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">tree =</span> TREE,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">u =</span> <span class="fl">1.0488</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> <span class="fl">0.9747</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_t =</span> <span class="dv">1</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">r =</span> <span class="fl">0.025</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">K =</span> <span class="dv">100</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">'call'</span> <span class="co"># specify 'call' or 'put' here</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>         [,1]     [,2]     [,3]
+[1,] 5.305857 0.000000 0.000000
+[2,] 1.474084 7.316775 0.000000
+[3,] 0.000000 2.226536 9.998144</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">CRR_model_call_put</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">tree =</span> TREE,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">u =</span> <span class="fl">1.0488</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">d =</span> <span class="fl">0.9747</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_t =</span> <span class="dv">1</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">r =</span> <span class="fl">0.025</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">K =</span> <span class="dv">100</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">'put'</span> <span class="co"># specify 'call' or 'put' here</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>          [,1] [,2] [,3]
+[1,] 0.4902577    0    0
+[2,] 1.5650313    0    0
+[3,] 4.9959910    0    0</code></pre>
+</div>
+</div>
+<ul>
+<li>Recall, our stock tree looked like:</li>
+</ul>
+<p><img src="binomialTreeRScriptExample.png" class="img-fluid"></p>
+<p>For a <strong>call</strong> option</p>
+<p><img src="optionTreeRCodeExample.png" class="img-fluid"></p>
+<p>For a <strong>put</strong> option</p>
+<p><img src="optionTreeRexamplePut.png" class="img-fluid"></p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
